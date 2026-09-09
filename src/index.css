@@ -1,0 +1,64 @@
+:root {
+  --font-display: "Newsreader", Georgia, serif;
+  --font-head: "Newsreader", Georgia, serif;
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --color-bg: #fafaf8;
+  --color-surface: #f2f2ef;
+  --color-text: #14161a;
+  --color-text-muted: #63666d;
+  --color-text-faint: #9a9ca3;
+
+  --rule-heavy: #14161a;
+  --rule-mid: #d7d8dc;
+  --rule-light: #e9eaec;
+
+  --color-signature: #2451a6;
+  --color-signature-tint: #eaf0fa;
+
+  --color-green: #1e8a5f;
+  --color-red: #b23b3b;
+
+  --color-stat-bg: #f2f2ef;
+
+  --cat-fed: #2451a6;
+  --cat-markets: #a6293d;
+  --cat-crypto: #6b3fa0;
+  --cat-tech: #0f7a6b;
+  --cat-economy: #b5541f;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+}
