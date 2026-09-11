@@ -63,10 +63,18 @@ async function fetchYahooTreasuryYield(attempt = 1) {
   return { price: meta.regularMarketPrice, changePercent: meta.regularMarketChangePercent ?? 0 };
 }
 
-async function fetchCoinGeckoPrices() {
+// CoinGecko's free tier shares rate limits across everyone on the same
+// cloud host IP (common on platforms like Render), so a 429 here doesn't
+// mean our own usage is excessive — it's frequently other tenants' traffic.
+// Worth a couple of retries since it tends to clear within seconds.
+async function fetchCoinGeckoPrices(attempt = 1) {
   const url =
     "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true";
   const res = await fetch(url);
+  if (res.status === 429 && attempt < 3) {
+    await sleep(attempt * 800);
+    return fetchCoinGeckoPrices(attempt + 1);
+  }
   if (!res.ok) throw new Error(`CoinGecko failed: ${res.status}`);
   return res.json();
 }
@@ -94,29 +102,48 @@ async function fetchFinnhubQuotesStaggered(symbols) {
 // Fetches real, live market data. Every number here comes directly from a
 // live provider response — nothing is invented or estimated.
 //
+// Each of the three sources (Finnhub, CoinGecko, Yahoo) is isolated with
+// its own .catch(): one failing (e.g. CoinGecko's shared-IP rate limit on
+// Render) must never take down the other two, which is what happened
+// before this was fixed — a single CoinGecko 429 was silently dropping
+// the perfectly good Finnhub stats too, because they shared one
+// Promise.all. Missing stats are simply omitted, never fabricated.
+//
 // Indices are tracked via their major ETF proxies (SPY/QQQ/DIA/USO) since
 // Finnhub's free tier doesn't include raw index quotes. That's disclosed
 // via each stat's label rather than presented as the literal index level,
 // since an ETF's own share price is a different real number from the
 // index it tracks (e.g. SPY trades at roughly 1/10th the S&P 500's level).
 export async function fetchMarketData() {
-  const [[spy, qqq, dia, uso], coingecko, treasuryResult] = await Promise.all([
-    fetchFinnhubQuotesStaggered(["SPY", "QQQ", "DIA", "USO"]),
-    fetchCoinGeckoPrices(),
+  const [finnhubResult, coingeckoResult, treasuryResult] = await Promise.all([
+    fetchFinnhubQuotesStaggered(["SPY", "QQQ", "DIA", "USO"]).catch((err) => {
+      console.warn(`[fetchMarketData] Finnhub unavailable this round: ${err.message}`);
+      return null;
+    }),
+    fetchCoinGeckoPrices().catch((err) => {
+      console.warn(`[fetchMarketData] CoinGecko unavailable this round: ${err.message}`);
+      return null;
+    }),
     fetchYahooTreasuryYield().catch((err) => {
       console.warn(`[fetchMarketData] Treasury yield unavailable this round: ${err.message}`);
       return null;
     }),
   ]);
 
-  const stats = {
-    sp500: formatPriceStat("S&P 500 (SPY)", spy.price, spy.changePercent),
-    nasdaq: formatPriceStat("Nasdaq (QQQ)", qqq.price, qqq.changePercent),
-    dow: formatPriceStat("Dow (DIA)", dia.price, dia.changePercent),
-    oil: formatPriceStat("Oil (USO)", uso.price, uso.changePercent),
-    btc: formatPriceStat("BTC", coingecko.bitcoin.usd, coingecko.bitcoin.usd_24h_change, 0),
-    eth: formatPriceStat("ETH", coingecko.ethereum.usd, coingecko.ethereum.usd_24h_change, 0),
-  };
+  const stats = {};
+
+  if (finnhubResult) {
+    const [spy, qqq, dia, uso] = finnhubResult;
+    stats.sp500 = formatPriceStat("S&P 500 (SPY)", spy.price, spy.changePercent);
+    stats.nasdaq = formatPriceStat("Nasdaq (QQQ)", qqq.price, qqq.changePercent);
+    stats.dow = formatPriceStat("Dow (DIA)", dia.price, dia.changePercent);
+    stats.oil = formatPriceStat("Oil (USO)", uso.price, uso.changePercent);
+  }
+
+  if (coingeckoResult) {
+    stats.btc = formatPriceStat("BTC", coingeckoResult.bitcoin.usd, coingeckoResult.bitcoin.usd_24h_change, 0);
+    stats.eth = formatPriceStat("ETH", coingeckoResult.ethereum.usd, coingeckoResult.ethereum.usd_24h_change, 0);
+  }
 
   if (treasuryResult) {
     stats.treasury10y = {
@@ -130,6 +157,6 @@ export async function fetchMarketData() {
   return {
     fetchedAt: new Date().toISOString(),
     stats,
-    raw: { spy, qqq, dia, uso, coingecko, treasuryResult },
+    raw: { finnhubResult, coingeckoResult, treasuryResult },
   };
 }
