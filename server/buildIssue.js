@@ -75,9 +75,9 @@ function statsForCategory(category, marketStats) {
     switch (category) {
       case "FED":
       case "ECONOMY":
-        return [marketStats.sp500, marketStats.dow];
+        return [marketStats.sp500, marketStats.treasury10y, marketStats.dow];
       case "MARKETS":
-        return [marketStats.sp500, marketStats.dow, marketStats.oil];
+        return [marketStats.sp500, marketStats.dow, marketStats.oil, marketStats.treasury10y];
       case "CRYPTO":
         return [marketStats.btc, marketStats.eth];
       case "TECH":

@@ -136,7 +136,6 @@ function ArticleView({ story, onBack }: { story: TopStory; onBack: () => void })
 function App() {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [openStoryId, setOpenStoryId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
 
@@ -157,16 +156,6 @@ function App() {
     const interval = setInterval(loadIssue, 60_000);
     return () => clearInterval(interval);
   }, [loadIssue]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fetch("/api/refresh", { method: "POST" });
-      await loadIssue();
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const openStory = (id: string) => {
     setOpenStoryId(id);
@@ -244,9 +233,6 @@ function App() {
           Live data · updated {formatRelativeTime(issue.fetchedAt)}
           {issue.meta?.status === "error" && " · last refresh failed, showing older data"}
         </span>
-        <button onClick={handleRefresh} disabled={refreshing}>
-          {refreshing ? "Refreshing…" : "Refresh now"}
-        </button>
       </div>
 
       {openStory_ ? (
@@ -255,7 +241,7 @@ function App() {
         <main>
           {filteredTopStories.length === 0 && filteredQuickHits.length === 0 ? (
             <p className="empty-state">
-              No {activeCategory?.toLowerCase()} stories right now. Try a different category or refresh.
+              No {activeCategory?.toLowerCase()} stories right now. Try a different category.
             </p>
           ) : (
             <>
